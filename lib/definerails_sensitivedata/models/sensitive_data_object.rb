@@ -7,10 +7,8 @@ module DefineRails
         module ActiveRecord
           extend ActiveSupport::Concern
 
-          included do
-            base.send :extend, ::AttrEncrypted
-
-            class << self; before_save :set_encryption_key end
+          included do |base|
+            base.send :before_save, :set_encryption_key
           end
 
           def set_encryption_key
@@ -29,6 +27,10 @@ module DefineRails
           end
 
           module ClassMethods
+
+            def enable_data_encryption
+              self.send :before_save, :set_encryption_key
+            end
 
             def add_encrypted_attribute(attribute_name, opts = {})
               unless self.respond_to? attribute_name
@@ -70,6 +72,12 @@ module DefineRails
             base.send :extend, ::AttrEncrypted
 
             class << self; attr_accessor :__is_encryptable end
+
+            base.send '__is_encryptable=', true
+
+            base.send :before_save, :set_encryption_key
+
+            base.send :field, :encryption_key, type: String
           end
 
           def set_encryption_key
@@ -88,14 +96,6 @@ module DefineRails
           end
 
           module ClassMethods
-
-            def enable_data_encryption
-              @__is_encryptable = true
-
-              self.send :before_save, :set_encryption_key
-
-              self.send :field, :encryption_key, type: String
-            end
 
             def is_encryptable?
               @__is_encryptable
