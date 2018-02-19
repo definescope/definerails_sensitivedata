@@ -1,5 +1,3 @@
-
-
 module DefineRails
   module SensitiveData
     module Models
@@ -15,50 +13,52 @@ module DefineRails
             class << self; before_save :set_encryption_key end
           end
 
+          def set_encryption_key
+            if self.has_attribute? :encryption_key
+              # 8 chars
+              self.encryption_key =
+                SecureRandom.hex(4) unless self.encryption_key.present?
+            end
+          end
 
-      #     def set_encryption_key
-      #       if self.has_attribute? :encryption_key
-      #         # 8 chars
-      #         self.encryption_key =
-      #           SecureRandom.hex(4) unless self.encryption_key.present?
-      #       end
-      #     end
+          def sensitive_data_encryption_key
+            set_encryption_key
+            the_key =
+              self.encryption_key +
+              ::DefineRails::SensitiveData.application_sensitive_data_encryption_key
+          end
 
+          module ClassMethods
 
-      #     def sensitive_data_encryption_key
-      #       set_encryption_key
-      #       the_key =
-      #         self.encryption_key +
-      #         Rails.configuration.x.sensitive_data_encryption_key
-      #     end
+            def add_encrypted_attribute(attribute_name, opts = {})
+              unless self.respond_to? attribute_name
+                self.send :attr_encryptor, attribute_name, key: :sensitive_data_encryption_key,
+                                                           marshal: true
+              end
+            end
 
+            def add_sensitive_attribute_accessors(attribute_name)
 
-      #     def self.add_encrypted_attribute(attribute_name, opts = {})
-      #       unless self.respond_to? attribute_name
-      #         self.send :attr_encryptor, attribute_name, key: :sensitive_data_encryption_key,
-      #                                                    marshal: true
-      #       end
-      #     end
+              unless self.respond_to? :sensitive_data
+                self.send :attr_encryptor, :sensitive_data, key: :sensitive_data_encryption_key,
+                                                            marshal: true
+              end
 
-      #     def self.add_sensitive_attribute_accessors(attribute_name)
+              self.send(:define_method, attribute_name) do
+                self.sensitive_data = {} if self.sensitive_data.nil?
 
-      #       unless self.respond_to? :sensitive_data
-      #         self.send :attr_encryptor, :sensitive_data, key: :sensitive_data_encryption_key,
-      #                                                     marshal: true
-      #       end
+                self.sensitive_data[attribute_name.to_s]
+              end
 
-      #       self.send(:define_method, attribute_name) do
-      #         self.sensitive_data = {} if self.sensitive_data.nil?
+              self.send(:define_method, "#{ attribute_name }=") do |the_value|
+                self.sensitive_data = {} if self.sensitive_data.nil?
 
-      #         self.sensitive_data[attribute_name.to_s]
-      #       end
+                self.sensitive_data[attribute_name.to_s] = the_value
+                self.sensitive_data = self.sensitive_data
+              end
+            end
 
-      #       self.send(:define_method, "#{ attribute_name }=") do |the_value|
-      #         self.sensitive_data = {} if self.sensitive_data.nil?
-
-      #         self.sensitive_data[attribute_name.to_s] = the_value
-      #         self.sensitive_data = self.sensitive_data
-      #       end
+          end
 
         end
 
@@ -69,7 +69,7 @@ module DefineRails
           included do |base|
             base.send :extend, ::AttrEncrypted
 
-            class << self; attr_accessor :is_encryptable end
+            class << self; attr_accessor :__is_encryptable end
           end
 
           def set_encryption_key
@@ -84,13 +84,13 @@ module DefineRails
             set_encryption_key
             the_key =
               self.encryption_key +
-              Rails.configuration.x.sensitive_data_encryption_key
+              ::DefineRails::SensitiveData.application_sensitive_data_encryption_key
           end
 
           module ClassMethods
 
             def enable_data_encryption
-              @is_encryptable = true
+              @__is_encryptable = true
 
               self.send :before_save, :set_encryption_key
 
@@ -98,7 +98,7 @@ module DefineRails
             end
 
             def is_encryptable?
-              @is_encryptable
+              @__is_encryptable
             end
 
             def add_encrypted_attribute(attribute_name, opts = {})
@@ -150,7 +150,6 @@ module DefineRails
         end
 
       end
-
     end
   end
 end
