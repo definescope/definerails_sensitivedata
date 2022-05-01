@@ -4,4 +4,3 @@ log/*
 !log/.keep
 tmp/*
 !tmp/.keep
-pkg/
