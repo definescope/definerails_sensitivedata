@@ -15,7 +15,8 @@ module DefineRails
 
         def decryption_keys(encrypted_message)
           _keys =
-            if encrypted_message.headers.encrypted_data_key_id
+            if ::ActiveRecord::Encryption.config.store_key_references &&
+               encrypted_message.headers.encrypted_data_key_id
               keys_grouped_by_id[encrypted_message.headers.encrypted_data_key_id]
             else
               _primary_keys
